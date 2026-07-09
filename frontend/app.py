@@ -3,73 +3,68 @@ import requests
 import streamlit as st
 
 st.set_page_config(
-    page_title="AI Invoice Extraction",
+    page_title="Invoice Extractor",
     page_icon="📄",
     layout="wide"
 )
 
-st.title("📄 AI Invoice Extraction")
-st.caption("Extract structured invoice data using PaddleOCR + Llama 3.2")
+st.title("📄 Invoice Extractor")
+
+st.write("Upload an invoice (PDF/JPG/PNG) to extract structured JSON.")
 
 uploaded_file = st.file_uploader(
-    "Upload Invoice",
-    type=["pdf", "png", "jpg", "jpeg"]
+    "Choose Invoice",
+    type=["pdf", "jpg", "jpeg", "png"]
 )
 
 if uploaded_file:
 
-    col1, col2 = st.columns([1, 1])
+    st.success(f"Uploaded: {uploaded_file.name}")
 
-    with col1:
+    if st.button("🚀 Extract Invoice"):
 
-        st.subheader("Uploaded File")
+        with st.spinner("Extracting invoice..."):
 
-        if uploaded_file.type.startswith("image"):
-            st.image(uploaded_file)
-
-        else:
-            st.info(uploaded_file.name)
-
-        if st.button("Extract Invoice", use_container_width=True):
-
-            with st.spinner("Processing invoice..."):
-
-                files = {
+            response = requests.post(
+                "http://127.0.0.1:8000/api/extract",
+                files={
                     "file": (
                         uploaded_file.name,
-                        uploaded_file.getvalue(),
+                        uploaded_file,
                         uploaded_file.type
                     )
                 }
+            )
 
-                response = requests.post(
-                    "http://127.0.0.1:8000/api/extract",
-                    files=files
-                )
+        if response.status_code == 200:
 
-            with col2:
+            result = response.json()
 
-                st.subheader("Extracted JSON")
+            st.success("✅ Extraction Completed")
 
-                if response.status_code == 200:
+            st.subheader("Extracted JSON")
 
-                    data = response.json()
+            st.json(result)
 
-                    st.success("Extraction completed")
+            # ----------------------------
+            # Download JSON
+            # ----------------------------
 
-                    st.json(data["invoice"])
+            json_data = json.dumps(
+                result,
+                indent=4,
+                ensure_ascii=False
+            )
 
-                    st.download_button(
-                        "Download JSON",
-                        json.dumps(
-                            data["invoice"],
-                            indent=4
-                        ),
-                        file_name="invoice.json",
-                        mime="application/json",
-                        use_container_width=True
-                    )
+            st.download_button(
+                label="📥 Download JSON",
+                data=json_data,
+                file_name=f"{uploaded_file.name.rsplit('.',1)[0]}.json",
+                mime="application/json"
+            )
 
-                else:
+        else:
 
-                    st.error(response.text)
+            st.error("Extraction Failed")
+
+            st.code(response.text)

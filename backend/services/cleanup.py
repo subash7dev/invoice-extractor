@@ -1,44 +1,164 @@
 import re
 
 
-def clean_text(text: str) -> str:
+class TextCleaner:
     """
-    Clean OCR output before sending it to the LLM.
+    Production-grade OCR text cleaner.
     """
 
-    if not text:
-        return ""
+    @staticmethod
+    def clean(text: str) -> str:
 
-    # Normalize newlines
-    text = text.replace("\r", "\n")
+        if not text:
+            return ""
 
-    # Remove tabs
-    text = text.replace("\t", " ")
+        text = TextCleaner.normalize_unicode(text)
 
-    # Collapse multiple spaces
-    text = re.sub(r"[ ]{2,}", " ", text)
+        text = TextCleaner.remove_control_characters(text)
 
-    # Remove empty lines
-    lines = [line.strip() for line in text.split("\n")]
-    lines = [line for line in lines if line]
+        text = TextCleaner.normalize_spaces(text)
 
-    cleaned = []
+        text = TextCleaner.remove_duplicate_lines(text)
 
-    i = 0
+        text = TextCleaner.fix_currency(text)
 
-    while i < len(lines):
-        line = lines[i]
+        text = TextCleaner.normalize_dates(text)
 
-        # Merge wrapped invoice labels
-        if (
-            line.lower().startswith("invoice")
-            and i + 1 < len(lines)
-            and len(lines[i + 1]) < 20
-        ):
-            line += " " + lines[i + 1]
-            i += 1
+        return text.strip()
 
-        cleaned.append(line)
-        i += 1
+    @staticmethod
+    def normalize_unicode(text: str) -> str:
 
-    return "\n".join(cleaned)
+        replacements = {
+
+            "₹": "INR ",
+
+            "$": "USD ",
+
+            "€": "EUR ",
+
+            "£": "GBP ",
+
+            "Rs.": "INR ",
+
+            "Rs": "INR ",
+
+            "GSTIN:": "GSTIN ",
+
+            "GST No.": "GSTIN ",
+
+            "GST No": "GSTIN "
+        }
+
+        for old, new in replacements.items():
+
+            text = text.replace(old, new)
+
+        return text
+
+    @staticmethod
+    def remove_control_characters(text: str) -> str:
+
+        return re.sub(
+            r"[\x00-\x1F\x7F]",
+            "",
+            text
+        )
+
+    @staticmethod
+    def normalize_spaces(text: str) -> str:
+
+        lines = []
+
+        for line in text.splitlines():
+
+            line = re.sub(
+                r"\s+",
+                " ",
+                line
+            ).strip()
+
+            if line:
+                lines.append(line)
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def remove_duplicate_lines(text: str) -> str:
+
+        unique = []
+
+        previous = None
+
+        for line in text.splitlines():
+
+            if line == previous:
+                continue
+
+            unique.append(line)
+
+            previous = line
+
+        return "\n".join(unique)
+
+    @staticmethod
+    def fix_currency(text: str) -> str:
+
+        text = re.sub(
+            r"USD\s+USD",
+            "USD",
+            text
+        )
+
+        text = re.sub(
+            r"INR\s+INR",
+            "INR",
+            text
+        )
+
+        return text
+
+    @staticmethod
+    def normalize_dates(text: str) -> str:
+
+        text = re.sub(
+
+            r"(\d{1,2})-(\d{1,2})-(\d{2,4})",
+
+            r"\1/\2/\3",
+
+            text
+        )
+
+        return text
+
+    @staticmethod
+    def split_lines(text: str):
+
+        return [
+
+            line.strip()
+
+            for line in text.splitlines()
+
+            if line.strip()
+
+        ]
+
+    @staticmethod
+    def to_lower(text: str):
+
+        return text.lower()
+
+    @staticmethod
+    def remove_empty(text: str):
+
+        return "\n".join(
+
+            line
+
+            for line in text.splitlines()
+
+            if line.strip()
+
+        )
